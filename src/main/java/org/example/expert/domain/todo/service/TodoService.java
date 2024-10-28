@@ -11,9 +11,11 @@ import org.example.expert.domain.todo.entity.Todo;
 import org.example.expert.domain.todo.repository.TodoRepository;
 import org.example.expert.domain.user.dto.response.UserResponse;
 import org.example.expert.domain.user.entity.User;
+import org.example.expert.domain.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,9 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class TodoService {
 
     private final TodoRepository todoRepository;
+    private final UserRepository userRepository;
     private final WeatherClient weatherClient;
 
     @Transactional
+    //authUser가 null로 손실되지 않았는지 검증하는 aop 추후에 추가할 것
     public TodoSaveResponse saveTodo(AuthUser authUser, TodoSaveRequest todoSaveRequest) {
         User user = User.fromAuthUser(authUser);
 
@@ -49,7 +53,7 @@ public class TodoService {
     }
 
     public Page<TodoResponse> getTodos(int page, int size) {
-        Pageable pageable = PageRequest.of(page - 1, size);
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "modifiedAt"));
 
         Page<Todo> todos = todoRepository.findAllByOrderByModifiedAtDesc(pageable);
 
@@ -68,7 +72,8 @@ public class TodoService {
         Todo todo = todoRepository.findByIdWithUser(todoId)
                 .orElseThrow(() -> new InvalidRequestException("Todo not found"));
 
-        User user = todo.getUser();
+        User user = userRepository.findById(todo.getUser().getId())
+                .orElseThrow(() -> new InvalidRequestException("User not found"));
 
         return new TodoResponse(
                 todo.getId(),

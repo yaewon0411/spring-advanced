@@ -15,7 +15,6 @@ import org.example.expert.domain.user.entity.User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -27,39 +26,22 @@ public class CommentService {
     private final CommentRepository commentRepository;
 
     @Transactional
+    //authUser 유실 안됐는지 aop 적용
     public CommentSaveResponse saveComment(AuthUser authUser, long todoId, CommentSaveRequest commentSaveRequest) {
         User user = User.fromAuthUser(authUser);
-        Todo todo = todoRepository.findById(todoId).orElseThrow(() ->
-                new InvalidRequestException("Todo not found"));
-
-        Comment newComment = new Comment(
-                commentSaveRequest.getContents(),
-                user,
-                todo
-        );
-
-        Comment savedComment = commentRepository.save(newComment);
+        Todo todo = todoRepository.findById(todoId)
+                .orElseThrow(() -> new InvalidRequestException("Todo not found"));
+        Comment savedComment = commentRepository.save(commentSaveRequest.toEntity(user, todo));
 
         return new CommentSaveResponse(
-                savedComment.getId(),
-                savedComment.getContents(),
+                savedComment,
                 new UserResponse(user)
         );
     }
 
     public List<CommentResponse> getComments(long todoId) {
-        List<Comment> commentList = commentRepository.findByTodoIdWithUser(todoId);
-
-        List<CommentResponse> dtoList = new ArrayList<>();
-        for (Comment comment : commentList) {
-            User user = comment.getUser();
-            CommentResponse dto = new CommentResponse(
-                    comment.getId(),
-                    comment.getContents(),
-                    new UserResponse(user)
-            );
-            dtoList.add(dto);
-        }
-        return dtoList;
+        return commentRepository.findByTodoIdWithUser(todoId).stream()
+                .map(comment -> new CommentResponse(comment, new UserResponse(comment.getUser())))
+                .toList();
     }
 }

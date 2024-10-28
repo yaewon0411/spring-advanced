@@ -7,6 +7,9 @@ import org.example.expert.domain.comment.entity.Comment;
 import org.example.expert.domain.common.entity.Timestamped;
 import org.example.expert.domain.manager.entity.Manager;
 import org.example.expert.domain.user.entity.User;
+import org.example.expert.ex.ErrorCode;
+import org.example.expert.ex.InvalidRequestException;
+import org.springframework.util.ObjectUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +20,8 @@ import java.util.List;
 @Table(name = "todos")
 public class Todo extends Timestamped {
 
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String title;
     private String contents;
@@ -44,5 +48,17 @@ public class Todo extends Timestamped {
     public void update(String title, String contents) {
         this.title = title;
         this.contents = contents;
+    }
+
+    public void validateTodoOwner(User user) {
+        if (!ObjectUtils.nullSafeEquals(user.getId(), this.getUser().getId())) {
+            throw new InvalidRequestException(ErrorCode.TODO_CREATOR_PERMISSION_DENIED);
+        }
+    }
+
+    public void validateNotSelfAssignment(Long userId) {
+        if (ObjectUtils.nullSafeEquals(this.user.getId(), userId)) {
+            throw new InvalidRequestException(ErrorCode.TODO_CREATOR_SELF_ASSIGNMENT_INVALID);
+        }
     }
 }

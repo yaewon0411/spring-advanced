@@ -17,7 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ObjectUtils;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -37,22 +36,22 @@ public class ManagerService {
                 .orElseThrow(() -> new InvalidRequestException("Todo not found"));
 
         if (!ObjectUtils.nullSafeEquals(user.getId(), todo.getUser().getId())) {
-            throw new InvalidRequestException("담당자를 등록하려고 하는 유저가 일정을 만든 유저가 유효하지 않습니다.");
+            throw new InvalidRequestException("해당 일정을 만든 유저만 담당자를 등록할 수 있습니다");
+        }
+
+        if (ObjectUtils.nullSafeEquals(user.getId(), managerSaveRequest.getManagerUserId())) {
+            throw new InvalidRequestException("일정 작성자는 본인을 담당자로 등록할 수 없습니다.");
         }
 
         User managerUser = userRepository.findById(managerSaveRequest.getManagerUserId())
                 .orElseThrow(() -> new InvalidRequestException("등록하려고 하는 담당자 유저가 존재하지 않습니다."));
-
-        if (ObjectUtils.nullSafeEquals(user.getId(), managerUser.getId())) {
-            throw new InvalidRequestException("일정 작성자는 본인을 담당자로 등록할 수 없습니다.");
-        }
 
         Manager newManagerUser = new Manager(managerUser, todo);
         Manager savedManagerUser = managerRepository.save(newManagerUser);
 
         return new ManagerSaveResponse(
                 savedManagerUser.getId(),
-                new UserResponse(managerUser.getId(), managerUser.getEmail())
+                new UserResponse(managerUser)
         );
     }
 
@@ -62,26 +61,21 @@ public class ManagerService {
 
         List<Manager> managerList = managerRepository.findByTodoIdWithUser(todo.getId());
 
-        List<ManagerResponse> dtoList = new ArrayList<>();
-        for (Manager manager : managerList) {
+        return managerList.stream().map(manager -> {
             User user = manager.getUser();
-            dtoList.add(new ManagerResponse(
+            return new ManagerResponse(
                     manager.getId(),
-                    new UserResponse(user.getId(), user.getEmail())
-            ));
-        }
-        return dtoList;
+                    new UserResponse(user));
+        }).toList();
     }
 
     @Transactional
-    public void deleteManager(long userId, long todoId, long managerId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new InvalidRequestException("User not found"));
-
+    //aop에서 authUser가 null로 유실되었는지 따로 검사하는거 적용
+    public void deleteManager(AuthUser authUser, long todoId, long managerId) {
         Todo todo = todoRepository.findById(todoId)
                 .orElseThrow(() -> new InvalidRequestException("Todo not found"));
 
-        if (todo.getUser() == null || !ObjectUtils.nullSafeEquals(user.getId(), todo.getUser().getId())) {
+        if (todo.getUser() == null || !ObjectUtils.nullSafeEquals(authUser.getId(), todo.getUser().getId())) {
             throw new InvalidRequestException("해당 일정을 만든 유저가 유효하지 않습니다.");
         }
 
